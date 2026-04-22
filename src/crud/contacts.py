@@ -1,4 +1,1 @@
-class ContactRepository:
-    """Repository layer placeholder for contact operations."""
-
-    pass
+"""CRUD helpers for contact operations."""
