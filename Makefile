@@ -1,15 +1,24 @@
-.PHONY: run restart clean
+.PHONY: run restart makemigrations migrate migrate-docker clean
 
 IMAGE_NAME = goit-fast-api
 CONTAINER_NAME = app-fast-api
 
-run:            ## Запустити контейнер (foreground)
+run:            ## Run containers in foreground
 	docker compose up
 
-restart:        ## Перезапустити контейнер
+restart:        ## Restart containers
 	docker compose restart
 
-clean:          ## Зупинити та видалити контейнер, образ і volume
+makemigrations: ## Create a new Alembic migration
+	alembic revision --autogenerate -m "auto"
+
+migrate:        ## Apply Alembic migrations locally
+	alembic upgrade head
+
+migrate-docker: ## Apply Alembic migrations in Docker
+	docker compose exec web alembic upgrade head
+
+clean:          ## Stop and remove containers, images, volumes, networks
 	docker compose down --volumes --rmi local
 	docker container prune -f
 	docker image prune -a -f
