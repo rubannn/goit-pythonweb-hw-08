@@ -1,29 +1,74 @@
-from sqlalchemy.orm import Session
+from datetime import date, timedelta
+from typing import cast
+
+from sqlalchemy import or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.contact import Contact
 from src.schemas.contact import ContactCreate, ContactUpdate
 
 
-def create_contact(db: Session, body: ContactCreate) -> Contact:
+def _get_next_birthday_date(birthday: date, current_date: date) -> date:
+    try:
+        next_birthday = birthday.replace(year=current_date.year)
+    except ValueError:
+        next_birthday = date(current_date.year, 2, 28)
+
+    if next_birthday < current_date:
+        try:
+            next_birthday = birthday.replace(year=current_date.year + 1)
+        except ValueError:
+            next_birthday = date(current_date.year + 1, 2, 28)
+
+    return next_birthday
+
+
+async def create_contact(db: AsyncSession, body: ContactCreate) -> Contact:
     contact = Contact(**body.model_dump())
     db.add(contact)
-    db.commit()
-    db.refresh(contact)
+    await db.commit()
+    await db.refresh(contact)
     return contact
 
 
-def get_contacts(db: Session) -> list[Contact]:
-    return db.query(Contact).all()
+async def get_contacts(db: AsyncSession) -> list[Contact]:
+    result = await db.execute(select(Contact))
+    return list(result.scalars().all())
 
 
-def get_contact_by_id(db: Session, contact_id: int) -> Contact | None:
-    return db.query(Contact).filter(Contact.id == contact_id).first()
+async def search_contacts(
+    db: AsyncSession,
+    first_name: str | None = None,
+    last_name: str | None = None,
+    email: str | None = None,
+) -> list[Contact]:
+    filters = []
+    if first_name:
+        filters.append(Contact.first_name.ilike(f"%{first_name}%"))
+    if last_name:
+        filters.append(Contact.last_name.ilike(f"%{last_name}%"))
+    if email:
+        filters.append(Contact.email.ilike(f"%{email}%"))
+
+    query = select(Contact)
+    if filters:
+        query = query.where(or_(*filters))
+
+    result = await db.execute(query)
+    return list(result.scalars().all())
 
 
-def update_contact(
-    db: Session, contact_id: int, body: ContactUpdate
+async def get_contact_by_id(
+    db: AsyncSession, contact_id: int
 ) -> Contact | None:
-    contact = get_contact_by_id(db, contact_id)
+    result = await db.execute(select(Contact).where(Contact.id == contact_id))
+    return result.scalar_one_or_none()
+
+
+async def update_contact(
+    db: AsyncSession, contact_id: int, body: ContactUpdate
+) -> Contact | None:
+    contact = await get_contact_by_id(db, contact_id)
 
     if contact is None:
         return None
@@ -32,17 +77,36 @@ def update_contact(
     for field, value in update_data.items():
         setattr(contact, field, value)
 
-    db.commit()
-    db.refresh(contact)
+    await db.commit()
+    await db.refresh(contact)
     return contact
 
 
-def delete_contact(db: Session, contact_id: int) -> Contact | None:
-    contact = get_contact_by_id(db, contact_id)
+async def delete_contact(db: AsyncSession, contact_id: int) -> Contact | None:
+    contact = await get_contact_by_id(db, contact_id)
 
     if contact is None:
         return None
 
-    db.delete(contact)
-    db.commit()
+    await db.delete(contact)
+    await db.commit()
     return contact
+
+
+async def get_upcoming_birthdays(
+    db: AsyncSession, days: int = 7
+) -> list[Contact]:
+    today = date.today()
+    end_date = today + timedelta(days=days)
+    result = await db.execute(select(Contact))
+    contacts = result.scalars().all()
+    upcoming_contacts = []
+
+    for contact in contacts:
+        birthday_value = cast(date, contact.birthday)
+        next_birthday = _get_next_birthday_date(birthday_value, today)
+
+        if today <= next_birthday <= end_date:
+            upcoming_contacts.append(contact)
+
+    return upcoming_contacts

@@ -22,5 +22,13 @@ class Settings:
             f"{self.DB_PORT}/{self.DB_NAME}"
         )
 
+    @property
+    def ASYNC_DATABASE_URL(self) -> str:
+        return (
+            f"postgresql+asyncpg://{self.DB_USER}:"
+            f"{self.DB_PASSWORD}@{self.DB_HOST}:"
+            f"{self.DB_PORT}/{self.DB_NAME}"
+        )
+
 
 settings = Settings()

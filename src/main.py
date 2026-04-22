@@ -1,10 +1,11 @@
 from fastapi import FastAPI
 
 from src.api.contacts import router as contacts_router
+from src.database.config import settings
 
 
 app = FastAPI(
-    title="Contacts API",
+    title=settings.APP_NAME,
     description="REST API for storing and managing contacts.",
     version="0.1.0",
 )
