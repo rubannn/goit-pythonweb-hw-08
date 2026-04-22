@@ -180,6 +180,6 @@ curl -X GET "http://127.0.0.1:8000/api/contacts/upcoming-birthdays"
 
 Seed-скрипт знаходиться тут:
 
-- [seed.py](/d:/Python/GoIT/goit-pythonweb-hw-08/src/database/seed.py)
+- [seed.py](src/database/seed.py)
 
 Він додає кілька контактів для швидкої перевірки API.
